@@ -188,6 +188,22 @@ sudo systemctl status mysql
 sudo tail -f /var/log/apache2/stattracker-error.log
 ```
 
+### La app carga sin estilos o dice "Base de datos no disponible"
+
+Estos sintomas suelen indicar que la VM se creo con un snippet antiguo:
+
+- La app usa Tailwind; el despliegue debe generar `css/tailwind.css` localmente para no depender de `cdn.tailwindcss.com`.
+- La app PHP lee la conexion MySQL desde variables `DB_*`; Apache debe definir `DB_HOST`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD`.
+
+Despues de actualizar `proxmox-snippets/stattracker-cloud-init.yml`, vuelve a subirlo al host Proxmox y recrea la VM:
+
+```bash
+scp proxmox-snippets/stattracker-cloud-init.yml root@TU_PROXMOX_IP:/var/lib/vz/snippets/stattracker-cloud-init.yml
+terraform apply -replace=proxmox_vm_qemu.stattracker
+```
+
+Cloud-init solo se ejecuta en el primer arranque. Si no recreas la VM, los cambios del snippet no se aplicaran automaticamente.
+
 ## Seguridad
 
 - **Nunca** subas `terraform.tfvars` a Git (contiene passwords)

@@ -1,4 +1,5 @@
 #cloud-config
+package_update: true
 package_upgrade: true
 
 packages:
@@ -18,34 +19,105 @@ packages:
   - git
   - composer
   - unzip
+  - nodejs
+  - npm
 
 runcmd:
-  # Iniciar y habilitar MySQL
-  - systemctl enable mysql
-  - systemctl start mysql
-
-  # Configurar MySQL - crear base de datos y usuario
   - |
-    mysql -e "CREATE DATABASE IF NOT EXISTS proyecto_imc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    mysql -e "CREATE USER IF NOT EXISTS 'stattracker'@'localhost' IDENTIFIED BY 'Stattracker2025!';"
-    mysql -e "GRANT ALL PRIVILEGES ON proyecto_imc.* TO 'stattracker'@'localhost';"
+    set -eux
+
+    APP_DIR="/var/www/stattracker"
+    GITHUB_REPO="https://github.com/AlvaroPavon/StatTracker.git"
+    GITHUB_BRANCH="main"
+    DB_HOST="localhost"
+    DB_NAME="proyecto_imc"
+    DB_USER="stattracker"
+    DB_PASSWORD="Stattracker2025!"
+
+    # Iniciar y habilitar MySQL
+    systemctl enable --now mysql
+
+    # Configurar MySQL: la app PHP lee estas credenciales desde variables DB_*.
+    mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+    mysql -e "ALTER USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';"
+    mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
 
-  # Clonar repositorio
-  - git clone --branch main https://github.com/AlvaroPavon/StatTracker.git /var/www/stattracker
+    # Clonar repositorio
+    rm -rf "${APP_DIR}"
+    git clone --depth 1 --branch "${GITHUB_BRANCH}" "${GITHUB_REPO}" "${APP_DIR}"
 
-  # Instalar dependencias PHP con Composer
-  - cd /var/www/stattracker && composer install --no-dev --optimize-autoloader --no-interaction
+    # Instalar dependencias PHP con Composer
+    cd "${APP_DIR}"
+    export COMPOSER_ALLOW_SUPERUSER=1
+    composer install --no-dev --optimize-autoloader --no-interaction
 
-  # Importar esquema de base de datos
-  - mysql proyecto_imc < /var/www/stattracker/database.sql
+    # Importar esquema de base de datos
+    mysql "${DB_NAME}" < "${APP_DIR}/database.sql"
 
-  # Configurar Apache para servir StatTracker
-  - |
-    cat > /etc/apache2/sites-available/stattracker.conf << 'APACHE_EOF'
+    # Generar CSS local de Tailwind. La app no debe depender del CDN del navegador.
+    cat > "${APP_DIR}/tailwind.config.cjs" << 'TAILWIND_CONFIG_EOF'
+    module.exports = {
+      content: ['./*.php', './src/**/*.php', './api/**/*.php', './js/**/*.js'],
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4A90E2',
+            secondary: '#50E3C2',
+            'background-light': '#F8F9FA',
+            'background-dark': '#1F2937',
+            'text-light': '#4A4A4A',
+            'text-dark': '#E5E7EB',
+            'border-light': '#E1E8ED',
+            'border-dark': '#374151',
+            'subtle-light': 'rgba(255, 255, 255, 0.1)',
+            'subtle-dark': 'rgba(0, 0, 0, 0.1)',
+            'secondary-text-light': '#374151',
+            'secondary-text-dark': '#D1D5DB'
+          },
+          fontFamily: {
+            display: ['Inter', 'sans-serif']
+          },
+          borderRadius: {
+            DEFAULT: '0.5rem',
+            lg: '0.75rem',
+            xl: '1rem',
+            full: '9999px'
+          }
+        }
+      },
+      plugins: [
+        require('@tailwindcss/forms'),
+        require('@tailwindcss/container-queries')
+      ]
+    };
+    TAILWIND_CONFIG_EOF
+
+    cat > "${APP_DIR}/tailwind-input.css" << 'TAILWIND_INPUT_EOF'
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+    TAILWIND_INPUT_EOF
+
+    npm install --no-audit --no-fund --no-save tailwindcss@3 @tailwindcss/forms @tailwindcss/container-queries animate.css
+    ./node_modules/.bin/tailwindcss -c tailwind.config.cjs -i tailwind-input.css -o css/tailwind.css --minify
+    cp node_modules/animate.css/animate.min.css css/animate.min.css
+
+    find "${APP_DIR}" -maxdepth 1 -type f -name '*.php' -exec sed -i 's#<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>#<link rel="stylesheet" href="css/tailwind.css"/>#g' {} \;
+    perl -0pi -e 's#<link\s+rel="stylesheet"\s+href="https://cdnjs\.cloudflare\.com/ajax/libs/animate\.css/4\.1\.1/animate\.min\.css"\s*/>#<link rel="stylesheet" href="css/animate.min.css"/>#g' "${APP_DIR}"/*.php
+
+    # Configurar Apache para servir StatTracker
+    cat > /etc/apache2/sites-available/stattracker.conf << APACHE_EOF
     <VirtualHost *:80>
         ServerName stattracker.local
         DocumentRoot /var/www/stattracker
+
+        SetEnv DB_HOST ${DB_HOST}
+        SetEnv DB_DATABASE ${DB_NAME}
+        SetEnv DB_USERNAME ${DB_USER}
+        SetEnv DB_PASSWORD ${DB_PASSWORD}
 
         <Directory /var/www/stattracker>
             Options -Indexes +FollowSymLinks
@@ -53,26 +125,27 @@ runcmd:
             Require all granted
         </Directory>
 
-        ErrorLog ${APACHE_LOG_DIR}/stattracker-error.log
-        CustomLog ${APACHE_LOG_DIR}/stattracker-access.log combined
+        ErrorLog \${APACHE_LOG_DIR}/stattracker-error.log
+        CustomLog \${APACHE_LOG_DIR}/stattracker-access.log combined
     </VirtualHost>
     APACHE_EOF
 
-  - a2dissite 000-default
-  - a2ensite stattracker
-  - a2enmod rewrite
-  - systemctl restart apache2
+    a2dissite 000-default
+    a2ensite stattracker
+    a2enmod rewrite headers expires env
 
-  # Configurar permisos
-  - chown -R www-data:www-data /var/www/stattracker
-  - chmod -R 755 /var/www/stattracker
-  - chmod -R 775 /var/www/stattracker/uploads
+    # Configurar permisos
+    mkdir -p "${APP_DIR}/uploads" "${APP_DIR}/logs"
+    chown -R www-data:www-data "${APP_DIR}"
+    find "${APP_DIR}" -type d -exec chmod 755 {} \;
+    find "${APP_DIR}" -type f -exec chmod 644 {} \;
+    chmod -R 775 "${APP_DIR}/uploads" "${APP_DIR}/logs"
 
-  # Habilitar y reiniciar servicios
-  - systemctl enable apache2
-  - systemctl restart apache2
+    # Habilitar y reiniciar servicios
+    systemctl enable apache2
+    systemctl restart apache2
 
-  # Verificar que todo funciona
-  - curl -s -o /dev/null -w "%{http_code}" http://localhost > /tmp/stattracker_status
+    # Verificar que todo funciona
+    curl -s -o /dev/null -w "%{http_code}" http://localhost > /tmp/stattracker_status
 
 final_message: "StatTracker desplegado correctamente despues de $UPTIME segundos"
