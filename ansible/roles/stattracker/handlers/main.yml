@@ -1,0 +1,9 @@
+---
+- name: restart apache
+  ansible.builtin.shell: apache2ctl configtest && systemctl restart apache2
+  changed_when: true
+
+- name: restart mysql
+  ansible.builtin.service:
+    name: mysql
+    state: restarted

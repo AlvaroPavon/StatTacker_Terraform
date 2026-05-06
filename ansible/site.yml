@@ -1,0 +1,6 @@
+---
+- name: Provision StatTracker on Debian
+  hosts: stattracker
+  become: true
+  roles:
+    - stattracker

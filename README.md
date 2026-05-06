@@ -122,6 +122,21 @@ terraform output vm_ip_address
 terraform output ssh_command
 ```
 
+## Paso 5: Reprovisionar con Ansible
+
+El directorio `ansible/` permite aplicar la configuracion de StatTracker por SSH de forma repetible: paquetes, Apache, MariaDB, repositorio, CSS local y validacion HTTP.
+
+En un nodo de control Linux o WSL:
+
+```bash
+sudo apt update
+sudo apt install -y ansible
+cd ansible
+ansible-playbook site.yml --ask-pass --ask-become-pass
+```
+
+La VM actual usa `su -` para elevar privilegios porque no tiene `sudo`. El inventario apunta a `192.168.5.34`; si Terraform asigna otra IP, actualiza `ansible/inventory.ini` con el valor de `terraform output vm_ip_address`.
+
 ## Personalizacion
 
 ### Cambiar recursos de la VM

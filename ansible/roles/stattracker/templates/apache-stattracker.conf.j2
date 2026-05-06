@@ -1,0 +1,18 @@
+<VirtualHost *:80>
+    ServerName stattracker.local
+    DocumentRoot {{ stattracker_app_dir }}
+
+    SetEnv DB_HOST {{ stattracker_db_host }}
+    SetEnv DB_DATABASE {{ stattracker_db_name }}
+    SetEnv DB_USERNAME {{ stattracker_db_user }}
+    SetEnv DB_PASSWORD {{ stattracker_db_password }}
+
+    <Directory {{ stattracker_app_dir }}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/stattracker-error.log
+    CustomLog ${APACHE_LOG_DIR}/stattracker-access.log combined
+</VirtualHost>

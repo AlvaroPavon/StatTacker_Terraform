@@ -1,0 +1,253 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install StatTracker packages
+  ansible.builtin.apt:
+    name: "{{ stattracker_packages }}"
+    state: present
+
+- name: Ensure MariaDB/MySQL is enabled and running
+  ansible.builtin.service:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Ensure Apache is enabled and running
+  ansible.builtin.service:
+    name: apache2
+    state: started
+    enabled: true
+
+- name: Ensure MySQL database and user exist
+  ansible.builtin.shell: |
+    set -e
+    mysql -e "CREATE DATABASE IF NOT EXISTS {{ stattracker_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql -e "CREATE USER IF NOT EXISTS '{{ stattracker_db_user }}'@'localhost' IDENTIFIED BY '{{ stattracker_db_password }}';"
+    mysql -e "ALTER USER '{{ stattracker_db_user }}'@'localhost' IDENTIFIED BY '{{ stattracker_db_password }}';"
+    mysql -e "GRANT ALL PRIVILEGES ON {{ stattracker_db_name }}.* TO '{{ stattracker_db_user }}'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
+  no_log: true
+  changed_when: false
+  notify: restart mysql
+
+- name: Trust app directory for root git operations
+  ansible.builtin.command:
+    cmd: "git config --global --add safe.directory {{ stattracker_app_dir }}"
+  changed_when: false
+
+- name: Checkout StatTracker repository
+  ansible.builtin.git:
+    repo: "{{ stattracker_repo }}"
+    dest: "{{ stattracker_app_dir }}"
+    version: "{{ stattracker_branch }}"
+    force: true
+    update: true
+  register: stattracker_git
+
+- name: Install Composer dependencies
+  ansible.builtin.command:
+    cmd: composer install --no-dev --optimize-autoloader --no-interaction
+    chdir: "{{ stattracker_app_dir }}"
+  environment:
+    COMPOSER_ALLOW_SUPERUSER: "1"
+  changed_when: false
+
+- name: Check imported database schema
+  ansible.builtin.shell: |
+    mysql -NBe "USE {{ stattracker_db_name }}; SHOW TABLES LIKE 'usuarios';"
+  register: stattracker_schema_check
+  changed_when: false
+
+- name: Import database schema when missing
+  ansible.builtin.shell: |
+    mysql "{{ stattracker_db_name }}" < "{{ stattracker_app_dir }}/database.sql"
+  when: "'usuarios' not in stattracker_schema_check.stdout"
+
+- name: Write Tailwind config
+  ansible.builtin.template:
+    src: tailwind.config.cjs.j2
+    dest: "{{ stattracker_app_dir }}/tailwind.config.cjs"
+    owner: root
+    group: root
+    mode: "0644"
+  register: stattracker_tailwind_config
+
+- name: Write Tailwind input CSS
+  ansible.builtin.template:
+    src: tailwind-input.css.j2
+    dest: "{{ stattracker_app_dir }}/tailwind-input.css"
+    owner: root
+    group: root
+    mode: "0644"
+  register: stattracker_tailwind_input
+
+- name: Check local CSS files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ stattracker_app_dir }}/css/tailwind.css"
+    - "{{ stattracker_app_dir }}/css/animate.min.css"
+  register: stattracker_css_files
+
+- name: Install frontend build dependencies
+  ansible.builtin.command:
+    cmd: npm install --no-audit --no-fund --no-save tailwindcss@3 @tailwindcss/forms @tailwindcss/container-queries animate.css
+    chdir: "{{ stattracker_app_dir }}"
+  when: stattracker_git.changed or stattracker_tailwind_config.changed or stattracker_tailwind_input.changed or not (stattracker_css_files.results | map(attribute='stat.exists') | min)
+
+- name: Build local CSS assets
+  ansible.builtin.shell: |
+    set -e
+    ./node_modules/.bin/tailwindcss -c tailwind.config.cjs -i tailwind-input.css -o css/tailwind.css --minify
+    cp node_modules/animate.css/animate.min.css css/animate.min.css
+  args:
+    chdir: "{{ stattracker_app_dir }}"
+  when: stattracker_git.changed or stattracker_tailwind_config.changed or stattracker_tailwind_input.changed or not (stattracker_css_files.results | map(attribute='stat.exists') | min)
+
+- name: Remove temporary frontend build files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ stattracker_app_dir }}/node_modules"
+    - "{{ stattracker_app_dir }}/package-lock.json"
+    - "{{ stattracker_app_dir }}/tailwind.config.cjs"
+    - "{{ stattracker_app_dir }}/tailwind-input.css"
+
+- name: Find top-level PHP entrypoints
+  ansible.builtin.find:
+    paths: "{{ stattracker_app_dir }}"
+    patterns: "*.php"
+    file_type: file
+    recurse: false
+  register: stattracker_php_files
+
+- name: Replace Tailwind CDN script with local CSS
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '<script src="https://cdn\.tailwindcss\.com\?plugins=forms,container-queries"></script>'
+    replace: '<link rel="stylesheet" href="css/tailwind.css"/>'
+  loop: "{{ stattracker_php_files.files | map(attribute='path') | list }}"
+
+- name: Replace Animate.css CDN link with local CSS
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: '(?s)<link\s+[^>]*https://cdnjs\.cloudflare\.com/ajax/libs/animate\.css/4\.1\.1/animate\.min\.css[^>]*>'
+    replace: '<link rel="stylesheet" href="css/animate.min.css"/>'
+  loop: "{{ stattracker_php_files.files | map(attribute='path') | list }}"
+
+- name: Patch CSP for private LAN HTTP access
+  ansible.builtin.shell: |
+    python3 - <<'PY'
+    from pathlib import Path
+
+    path = Path("{{ stattracker_app_dir }}/src/SecurityHeaders.php")
+    text = path.read_text()
+    changed = False
+
+    old = """$isDevelopment = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) ||
+                            (isset($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], 'localhost') !== false);"""
+    new = """$hostHeader = $_SERVER['HTTP_HOST'] ?? '';
+            $hostName = explode(':', $hostHeader)[0];
+            $isPrivateLan = (bool) preg_match('/^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)/', $hostName);
+            $isDevelopment = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) ||
+                            strpos($hostHeader, 'localhost') !== false ||
+                            $isPrivateLan;"""
+
+    if old in text:
+        text = text.replace(old, new)
+        changed = True
+
+    for line in [
+        '            "upgrade-insecure-requests",\n',
+        '            "block-all-mixed-content"\n',
+        '            "block-all-mixed-content",\n',
+    ]:
+        if line in text:
+            text = text.replace(line, '')
+            changed = True
+
+    if changed:
+        path.write_text(text)
+        print("changed")
+    else:
+        print("ok")
+    PY
+  register: stattracker_csp_patch
+  changed_when: "'changed' in stattracker_csp_patch.stdout"
+
+- name: Configure Apache virtual host
+  ansible.builtin.template:
+    src: apache-stattracker.conf.j2
+    dest: /etc/apache2/sites-available/stattracker.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart apache
+
+- name: Enable Apache modules
+  ansible.builtin.command:
+    cmd: "a2enmod {{ item }}"
+    creates: "/etc/apache2/mods-enabled/{{ item }}.load"
+  loop:
+    - rewrite
+    - headers
+    - expires
+    - env
+  notify: restart apache
+
+- name: Enable StatTracker site
+  ansible.builtin.command:
+    cmd: a2ensite stattracker
+    creates: /etc/apache2/sites-enabled/stattracker.conf
+  notify: restart apache
+
+- name: Disable default Apache site
+  ansible.builtin.file:
+    path: /etc/apache2/sites-enabled/000-default.conf
+    state: absent
+  notify: restart apache
+
+- name: Ensure writable app directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0775"
+  loop:
+    - "{{ stattracker_app_dir }}/uploads"
+    - "{{ stattracker_app_dir }}/logs"
+
+- name: Set StatTracker ownership
+  ansible.builtin.file:
+    path: "{{ stattracker_app_dir }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    recurse: true
+
+- name: Validate Apache configuration
+  ansible.builtin.command:
+    cmd: apache2ctl configtest
+  changed_when: false
+
+- name: Apply pending service handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify StatTracker HTTP response
+  ansible.builtin.uri:
+    url: http://localhost/
+    return_content: true
+    status_code: 200
+  register: stattracker_http
+
+- name: Assert StatTracker is using local CSS and database is available
+  ansible.builtin.assert:
+    that:
+      - "'css/tailwind.css' in stattracker_http.content"
+      - "'Base de datos no disponible' not in stattracker_http.content"
+    fail_msg: "StatTracker responde, pero no esta aplicando CSS local o la base de datos sigue fallando."

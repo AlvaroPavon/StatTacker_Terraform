@@ -1,0 +1,35 @@
+module.exports = {
+  content: ['./*.php', './src/**/*.php', './api/**/*.php', './js/**/*.js'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        primary: '#4A90E2',
+        secondary: '#50E3C2',
+        'background-light': '#F8F9FA',
+        'background-dark': '#1F2937',
+        'text-light': '#4A4A4A',
+        'text-dark': '#E5E7EB',
+        'border-light': '#E1E8ED',
+        'border-dark': '#374151',
+        'subtle-light': 'rgba(255, 255, 255, 0.1)',
+        'subtle-dark': 'rgba(0, 0, 0, 0.1)',
+        'secondary-text-light': '#374151',
+        'secondary-text-dark': '#D1D5DB'
+      },
+      fontFamily: {
+        display: ['Inter', 'sans-serif']
+      },
+      borderRadius: {
+        DEFAULT: '0.5rem',
+        lg: '0.75rem',
+        xl: '1rem',
+        full: '9999px'
+      }
+    }
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/container-queries')
+  ]
+};

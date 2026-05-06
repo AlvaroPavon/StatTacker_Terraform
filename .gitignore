@@ -1,8 +1,9 @@
 *.tfvars
 .terraform/
-.terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
 *.tfplan
 IA_CONTEXT.md
-terraform.tfvars.example
+ansible/*.retry
+ansible/.vault-pass
+ansible/group_vars/*/vault.yml
