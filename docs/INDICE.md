@@ -14,6 +14,7 @@ Esta carpeta documenta el proyecto completo: que hace, como se ha construido, co
 8. [Troubleshooting](08-troubleshooting.md)
 9. [Seguridad y secretos](09-seguridad.md)
 10. [Cambios realizados](10-cambios-realizados.md)
+11. [API y aplicacion movil](11-api-mobile.md)
 
 ## Documentos PDF De Referencia
 

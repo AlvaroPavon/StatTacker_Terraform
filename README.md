@@ -30,6 +30,7 @@ La documentacion completa esta en `docs/`:
 - [Troubleshooting](docs/08-troubleshooting.md)
 - [Seguridad y secretos](docs/09-seguridad.md)
 - [Cambios realizados](docs/10-cambios-realizados.md)
+- [API y aplicacion movil](docs/11-api-mobile.md)
 
 ## Estructura Del Repositorio
 
@@ -79,6 +80,12 @@ Desde un navegador:
 
 ```text
 http://192.168.5.34/
+```
+
+API para la app movil:
+
+```text
+http://192.168.5.34/api
 ```
 
 ## Regla Importante

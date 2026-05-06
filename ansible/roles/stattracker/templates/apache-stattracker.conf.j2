@@ -2,6 +2,8 @@
     ServerName stattracker.local
     DocumentRoot {{ stattracker_app_dir }}
 
+    Alias /proyecto_imc {{ stattracker_app_dir }}
+
     SetEnv DB_HOST {{ stattracker_db_host }}
     SetEnv DB_DATABASE {{ stattracker_db_name }}
     SetEnv DB_USERNAME {{ stattracker_db_user }}

@@ -35,10 +35,30 @@ Se creo `ansible/`:
 - Rol `stattracker`.
 - Plantillas Apache y Tailwind.
 - Tareas para instalar paquetes, clonar app, preparar DB, generar CSS, parchear CSP y verificar HTTP.
+- Tareas para integrar la API en `/api` y mantener compatibilidad con `/proyecto_imc/api`.
+- Tareas para permitir checks de salud desde LAN privada sin que `UltimateShield` bloquee la IP.
+- Tareas para limpiar bloqueos temporales LAN en `blocked_ips.json`.
 
 ## Cambios En Documentacion
 
 Se creo esta documentacion en `docs/` y se actualizo `README.md` como entrada principal del proyecto.
+
+## Cambios En API Y Movil
+
+Se reviso la API del repo de aplicacion y se integro en Proxmox para que responda en:
+
+```text
+http://192.168.5.34/api
+http://192.168.5.34/proyecto_imc/api
+```
+
+Tambien se documento como debe apuntar la app Android nativa a la VM. La URL base debe ser la raiz web:
+
+```text
+http://192.168.5.34/
+```
+
+Retrofit ya anade `api/...` en cada endpoint.
 
 ## Comprobaciones Ejecutadas
 

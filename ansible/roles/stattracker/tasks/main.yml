@@ -179,6 +179,88 @@
   register: stattracker_csp_patch
   changed_when: "'changed' in stattracker_csp_patch.stdout"
 
+- name: Patch API router base path for root and legacy URLs
+  ansible.builtin.shell: |
+    python3 - <<'PY'
+    from pathlib import Path
+
+    path = Path("{{ stattracker_app_dir }}/api/index.php")
+    text = path.read_text()
+    normalized = text.replace("\r\n", "\n")
+
+    old = """$basePath = '/proyecto_imc/api';
+    if (strpos($request, $basePath) !== 0) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Endpoint no encontrado']);
+        exit;
+    }
+
+    // Extraer path relativo a /api
+    $path = substr($request, strlen($basePath));"""
+
+    new = """$basePaths = ['/api', '/proyecto_imc/api'];
+    $basePath = null;
+
+    foreach ($basePaths as $candidateBasePath) {
+        if ($request === $candidateBasePath || strpos($request, $candidateBasePath . '/') === 0) {
+            $basePath = $candidateBasePath;
+            break;
+        }
+    }
+
+    if ($basePath === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Endpoint no encontrado']);
+        exit;
+    }
+
+    // Extraer path relativo a /api
+    $path = substr($request, strlen($basePath));"""
+
+    if old in normalized:
+        normalized = normalized.replace(old, new)
+        path.write_text(normalized)
+        print("changed")
+    elif "$basePaths = ['/api', '/proyecto_imc/api'];" in normalized:
+        print("ok")
+    else:
+        raise SystemExit("No se pudo encontrar el bloque de ruta base de api/index.php")
+    PY
+  register: stattracker_api_router_patch
+  changed_when: "'changed' in stattracker_api_router_patch.stdout"
+
+- name: Patch UltimateShield for private LAN health checks
+  ansible.builtin.shell: |
+    python3 - <<'PY'
+    from pathlib import Path
+
+    path = Path("{{ stattracker_app_dir }}/src/UltimateShield.php")
+    text = path.read_text()
+
+    old = """$isLocalhost = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']) ||
+                          (isset($_SERVER['HTTP_HOST']) && strpos($_SERVER['HTTP_HOST'], 'localhost') !== false);"""
+
+    new = """$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+            $hostHeader = $_SERVER['HTTP_HOST'] ?? '';
+            $hostName = explode(':', $hostHeader)[0];
+            $isPrivateLan = (bool) preg_match('/^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)/', $remoteAddr) ||
+                            (bool) preg_match('/^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)/', $hostName);
+            $isLocalhost = in_array($remoteAddr, ['127.0.0.1', '::1']) ||
+                          strpos($hostHeader, 'localhost') !== false ||
+                          $isPrivateLan;"""
+
+    if old in text:
+        text = text.replace(old, new)
+        path.write_text(text)
+        print("changed")
+    elif "$isPrivateLan = (bool) preg_match" in text:
+        print("ok")
+    else:
+        raise SystemExit("No se pudo encontrar el bloque isLocalhost de UltimateShield.php")
+    PY
+  register: stattracker_ultimate_shield_patch
+  changed_when: "'changed' in stattracker_ultimate_shield_patch.stdout"
+
 - name: Configure Apache virtual host
   ansible.builtin.template:
     src: apache-stattracker.conf.j2
@@ -222,6 +304,36 @@
     - "{{ stattracker_app_dir }}/uploads"
     - "{{ stattracker_app_dir }}/logs"
 
+- name: Clear private LAN IP blocks
+  ansible.builtin.shell: |
+    python3 - <<'PY'
+    import json
+    import re
+    from pathlib import Path
+
+    path = Path("{{ stattracker_app_dir }}/logs/blocked_ips.json")
+    private = re.compile(r'^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)')
+
+    if not path.exists():
+        print("ok")
+        raise SystemExit
+
+    try:
+        data = json.loads(path.read_text() or "{}")
+    except json.JSONDecodeError:
+        data = {}
+
+    cleaned = {ip: value for ip, value in data.items() if not private.match(ip)}
+
+    if cleaned != data:
+        path.write_text(json.dumps(cleaned, indent=4, ensure_ascii=False))
+        print("changed")
+    else:
+        print("ok")
+    PY
+  register: stattracker_lan_blocks
+  changed_when: "'changed' in stattracker_lan_blocks.stdout"
+
 - name: Set StatTracker ownership
   ansible.builtin.file:
     path: "{{ stattracker_app_dir }}"
@@ -232,7 +344,13 @@
 
 - name: Validate Apache configuration
   ansible.builtin.command:
-    cmd: apache2ctl configtest
+    cmd: /usr/sbin/apache2ctl configtest
+  changed_when: false
+
+- name: Reload Apache configuration
+  ansible.builtin.service:
+    name: apache2
+    state: reloaded
   changed_when: false
 
 - name: Apply pending service handlers
@@ -251,3 +369,30 @@
       - "'css/tailwind.css' in stattracker_http.content"
       - "'Base de datos no disponible' not in stattracker_http.content"
     fail_msg: "StatTracker responde, pero no esta aplicando CSS local o la base de datos sigue fallando."
+
+- name: Verify StatTracker API root route
+  ansible.builtin.uri:
+    url: http://localhost/api/auth/login
+    method: POST
+    body_format: json
+    body: {}
+    return_content: true
+    status_code: 400
+  register: stattracker_api_root
+
+- name: Verify StatTracker API legacy route
+  ansible.builtin.uri:
+    url: http://localhost/proyecto_imc/api/auth/login
+    method: POST
+    body_format: json
+    body: {}
+    return_content: true
+    status_code: 400
+  register: stattracker_api_legacy
+
+- name: Assert StatTracker API routes are integrated
+  ansible.builtin.assert:
+    that:
+      - "'Endpoint no encontrado' not in stattracker_api_root.content"
+      - "'Endpoint no encontrado' not in stattracker_api_legacy.content"
+    fail_msg: "La API no esta integrada correctamente en Apache o el router no reconoce las rutas esperadas."

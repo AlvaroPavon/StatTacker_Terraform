@@ -99,6 +99,52 @@ En Terraform debe existir:
 start_at_node_boot = true
 ```
 
+## La API Devuelve 404
+
+Comprobar la ruta canonica:
+
+```bash
+curl -i -X POST http://localhost/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Comprobar la ruta legacy:
+
+```bash
+curl -i -X POST http://localhost/proyecto_imc/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Resultado esperado: `400 Bad Request`. Si devuelve `Endpoint no encontrado`, ejecutar Ansible para aplicar el Alias de Apache y el parche del router:
+
+```bash
+cd /home/stattracker/StatTacker_Terraform/ansible
+ansible-playbook site.yml --ask-pass --ask-become-pass
+```
+
+## La Web Devuelve 403 Desde La LAN
+
+Sintoma:
+
+- `curl http://localhost/` dentro de la VM devuelve `200`.
+- `http://192.168.5.34/` desde otro equipo devuelve `403 Forbidden`.
+
+Causa observada:
+
+- `UltimateShield` detecta ciertos User-Agent de herramientas como `curl` y bloquea temporalmente la IP.
+- El bloqueo queda en `/var/www/stattracker/logs/blocked_ips.json`.
+
+Comprobar:
+
+```bash
+cat /var/www/stattracker/logs/blocked_ips.json
+tail -n 40 /var/www/stattracker/logs/security.log
+```
+
+El rol Ansible corrige el comportamiento en LAN privada y limpia bloqueos temporales de rangos `10.x.x.x`, `172.16-31.x.x` y `192.168.x.x`.
+
 ## Apache O MariaDB No Arrancan Con Debian
 
 ```bash

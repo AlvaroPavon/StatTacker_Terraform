@@ -8,6 +8,20 @@ Entorno actual:
 http://192.168.5.34/
 ```
 
+## Acceso API
+
+Ruta canonica para clientes nuevos:
+
+```text
+http://192.168.5.34/api
+```
+
+Ruta legacy compatible:
+
+```text
+http://192.168.5.34/proyecto_imc/api
+```
+
 Si se recrea la VM y cambia la IP:
 
 ```bash

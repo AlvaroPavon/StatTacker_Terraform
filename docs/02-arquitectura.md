@@ -5,7 +5,9 @@
 ```mermaid
 flowchart TD
     U["Usuario en navegador"] -->|HTTP 80| A["Apache en Debian VM"]
+    M["App movil Android"] -->|HTTP 80 /api| A
     A --> P["PHP 8.2 / StatTracker"]
+    P --> API["API REST PHP /api"]
     P --> D["MariaDB/MySQL proyecto_imc"]
     P --> C["CSS local: tailwind.css / animate.min.css"]
     T["Terraform"] --> X["API Proxmox"]
@@ -62,6 +64,22 @@ SetEnv DB_PASSWORD <valor-local>
 ```
 
 La contrasena real no debe documentarse ni subirse a GitHub.
+
+## API REST
+
+La API de la aplicacion queda servida por Apache en:
+
+```text
+http://192.168.5.34/api
+```
+
+Para compatibilidad con clientes que usaban la ruta antigua, tambien funciona:
+
+```text
+http://192.168.5.34/proyecto_imc/api
+```
+
+Ansible configura `Alias /proyecto_imc` en Apache y parchea el router `api/index.php` para aceptar ambas bases.
 
 ## Base De Datos
 

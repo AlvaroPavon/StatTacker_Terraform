@@ -49,12 +49,16 @@ El rol `stattracker`:
 9. Copia Animate.css local.
 10. Reemplaza enlaces CDN por CSS local.
 11. Parchea CSP para acceso HTTP en LAN.
-12. Crea VirtualHost Apache.
-13. Habilita modulos Apache.
-14. Ajusta permisos.
-15. Valida Apache.
-16. Comprueba HTTP `200`.
-17. Comprueba que no aparece el aviso de base de datos.
+12. Parchea el router de la API para `/api` y `/proyecto_imc/api`.
+13. Ajusta UltimateShield para permitir checks de salud desde LAN privada.
+14. Crea VirtualHost Apache con Alias legacy `/proyecto_imc`.
+15. Habilita modulos Apache.
+16. Limpia bloqueos temporales de IPs privadas en `blocked_ips.json`.
+17. Ajusta permisos.
+18. Valida Apache.
+19. Comprueba HTTP `200`.
+20. Comprueba que no aparece el aviso de base de datos.
+21. Comprueba que la API responde en la ruta canonica y en la ruta legacy.
 
 ## Comandos
 
