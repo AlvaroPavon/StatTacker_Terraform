@@ -1,42 +1,37 @@
-# Ansible para StatTracker
+# Ansible Para StatTracker
 
-Este playbook configura StatTracker dentro de la VM Debian por SSH. Complementa a Terraform: Terraform crea la VM en Proxmox y Ansible deja instalado Apache, PHP, MariaDB, Composer, la app y los CSS locales.
+Este directorio contiene el playbook que configura StatTracker dentro de la VM Debian por SSH.
 
-## Requisitos
+Terraform crea o modifica la VM en Proxmox. Ansible deja el sistema operativo y la aplicacion en el estado correcto: paquetes, Apache, MariaDB, Composer, CSS local, CSP y validacion HTTP.
 
-Instala Ansible en el nodo de control. En Linux o WSL:
-
-```bash
-sudo apt update
-sudo apt install -y ansible
-```
-
-La VM actual no tiene `sudo`, por eso el inventario usa `su` como metodo de escalado. Cuando Ansible pida la contraseña SSH y la contraseña de `su`, usa la contraseña correspondiente del usuario `stattracker` y de root.
-
-## Uso con la VM actual
+## Uso Rapido
 
 ```bash
 cd ansible
 ansible-playbook site.yml --ask-pass --ask-become-pass
 ```
 
-El inventario apunta ahora a `192.168.5.34`. Si Terraform crea otra IP, cambia `ansible_host` en `inventory.ini` o genera un inventario nuevo con `terraform output vm_ip_address`.
+La VM actual no tiene `sudo`, por eso `ansible.cfg` e `inventory.ini` usan `su` como metodo de escalado.
 
-## Variables utiles
+## Inventario Actual
 
-Las variables principales estan en `roles/stattracker/defaults/main.yml`. Puedes sobrescribirlas con `--extra-vars` o variables de entorno:
-
-```bash
-STATTRACKER_DB_PASSWORD='otra-password' ansible-playbook site.yml --ask-pass --ask-become-pass
+```text
+192.168.5.34
 ```
 
-## Que configura
+Si cambia la IP, actualizar `inventory.ini`.
 
-- Paquetes Debian necesarios para Apache, PHP, MariaDB, Composer, Node/NPM y curl.
-- Base de datos `proyecto_imc` y usuario MySQL `stattracker`.
-- Repositorio `AlvaroPavon/StatTracker` en `/var/www/stattracker`.
-- Dependencias Composer.
-- CSS local `css/tailwind.css` y `css/animate.min.css`, sin depender del CDN.
-- VirtualHost Apache con variables `DB_*`.
-- CSP compatible con acceso HTTP por IP privada de LAN.
-- Verificacion HTTP final contra `http://localhost/`.
+## Comprobacion
+
+```bash
+ansible-playbook site.yml --syntax-check
+ansible stattracker -m ping -e ansible_password=<SSH_PASSWORD> -e ansible_become_password=<ROOT_PASSWORD>
+```
+
+## Documentacion Completa
+
+Ver:
+
+- `../docs/05-ansible.md`
+- `../docs/07-despliegue.md`
+- `../docs/08-troubleshooting.md`

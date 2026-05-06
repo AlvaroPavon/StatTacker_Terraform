@@ -1,20 +1,27 @@
 resource "proxmox_vm_qemu" "stattracker" {
-  name       = var.vm_name
-  target_node = var.pm_node
-  agent      = 1
-  memory     = var.vm_memory
-  scsihw     = "virtio-scsi-single"
-  os_type    = "cloud-init"
-  pool       = var.pm_pool != "" ? var.pm_pool : null
-  vm_state   = "running"
-  boot       = "order=scsi0"
-  clone      = var.pm_template
+  name               = var.vm_name
+  target_node        = var.pm_node
+  agent              = 1
+  memory             = var.vm_memory
+  scsihw             = "virtio-scsi-single"
+  os_type            = "cloud-init"
+  pool               = var.pm_pool != "" ? var.pm_pool : null
+  vm_state           = "running"
+  start_at_node_boot = true
+  boot               = "order=scsi0"
+  clone              = var.pm_template
+
+  startup_shutdown {
+    order            = 1
+    startup_delay    = 60
+    shutdown_timeout = 30
+  }
 
   sshkeys   = var.ssh_key_file != "" ? file(var.ssh_key_file) : ""
   ciupgrade = true
 
-  ipconfig0  = "ip=dhcp"
-  skip_ipv6  = true
+  ipconfig0 = "ip=dhcp"
+  skip_ipv6 = true
 
   ciuser     = var.ci_user
   cipassword = var.ci_password
@@ -48,8 +55,8 @@ resource "proxmox_vm_qemu" "stattracker" {
   }
 
   network {
-    id    = 0
-    model = "virtio"
+    id     = 0
+    model  = "virtio"
     bridge = var.pm_bridge
   }
 
