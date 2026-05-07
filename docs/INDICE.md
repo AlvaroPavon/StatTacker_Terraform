@@ -16,6 +16,7 @@ Esta carpeta documenta el proyecto completo: que hace, como se ha construido, co
 10. [Cambios realizados](10-cambios-realizados.md)
 11. [API y aplicacion movil](11-api-mobile.md)
 12. **[ENTREGABLE: Memoria completa del proyecto](ENTREGABLE.md)**
+13. **[Proyecto Terraform: documentación para actividad](TERRAFORM_PROYECTO.md)**
 
 ## Documentos PDF De Referencia
 
