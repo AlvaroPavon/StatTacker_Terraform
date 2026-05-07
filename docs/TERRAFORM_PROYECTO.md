@@ -557,5 +557,4 @@ curl -I http://192.168.5.34/
 
 ---
 
-*Documento generado el 7 de mayo de 2026*  
 *Álvaro Pavón, Manuel Losa Barrios - 2º CFGS DAM - Puesta en Producción Segura*
