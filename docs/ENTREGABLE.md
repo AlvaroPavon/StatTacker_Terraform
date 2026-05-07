@@ -1220,4 +1220,4 @@ La combinación de estas herramientas permite un despliegue completamente automa
 ---
 
 *Documento generado el 7 de mayo de 2026*  
-*Álvaro Pavón - 2º CFGS DAM - Despliegue de Aplicaciones Web*
+*Álvaro Pavón, Manuel Losa Barrios- 2º CFGS DAM - Despliegue de Aplicaciones Web*
