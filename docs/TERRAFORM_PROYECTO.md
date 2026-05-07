@@ -1,8 +1,8 @@
 # Proyecto Terraform: Despliegue de StatTracker en Proxmox
 
-**Autor:** Álvaro Pavón  
+**Autor:** Álvaro Pavón, Manuel Losa Barrios  
 **Actividad:** Creación de un proyecto Terraform  
-**Módulo:** Despliegue de Aplicaciones Web  
+**Módulo:** Puesta en Producción Segura  
 
 ---
 
@@ -558,4 +558,4 @@ curl -I http://192.168.5.34/
 ---
 
 *Documento generado el 7 de mayo de 2026*  
-*Álvaro Pavón - 2º CFGS DAM - Despliegue de Aplicaciones Web*
+*Álvaro Pavón, Manuel Losa Barrios - 2º CFGS DAM - Puesta en Producción Segura*

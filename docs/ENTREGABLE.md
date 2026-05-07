@@ -2,7 +2,7 @@
 
 **Autor:** Álvaro Pavón, Manuel Losa Barrios 
 **Curso:** 2º CFGS Desarrollo de Aplicaciones Multiplataforma  
-**Módulo:** Despliegue de Aplicaciones Web  
+**Módulo:** Puesta en Producción Segura  
 
 ---
 
@@ -1205,7 +1205,7 @@ curl -sk -H 'Authorization: PVEAPIToken=...' \
 
 ### 15.4 Reflexión personal
 
-Este proyecto ha permitido aplicar los conocimientos adquiridos en el módulo de Despliegue de Aplicaciones Web, integrando múltiples tecnologías de automatización y gestión de infraestructura:
+Este proyecto ha permitido aplicar los conocimientos adquiridos en el módulo de Puesta en Producción Segura, integrando múltiples tecnologías de automatización y gestión de infraestructura:
 
 - **Infrastructure as Code** con Terraform para la creación de máquinas virtuales.
 - **Cloud-init** para la inicialización automatizada de sistemas.
@@ -1220,4 +1220,4 @@ La combinación de estas herramientas permite un despliegue completamente automa
 ---
 
 *Documento generado el 7 de mayo de 2026*  
-*Álvaro Pavón, Manuel Losa Barrios- 2º CFGS DAM - Despliegue de Aplicaciones Web*
+*Álvaro Pavón, Manuel Losa Barrios - 2º CFGS DAM - Puesta en Producción Segura*
