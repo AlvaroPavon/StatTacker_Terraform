@@ -1,6 +1,6 @@
 # Memoria del Proyecto: Despliegue de StatTracker en Proxmox con Terraform, Ansible y WSL2
 
-**Autor:** Álvaro Pavón  
+**Autor:** Álvaro Pavón, Manuel Losa Barrios 
 **Curso:** 2º CFGS Desarrollo de Aplicaciones Multiplataforma  
 **Módulo:** Despliegue de Aplicaciones Web  
 
