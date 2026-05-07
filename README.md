@@ -31,6 +31,7 @@ La documentacion completa esta en `docs/`:
 - [Seguridad y secretos](docs/09-seguridad.md)
 - [Cambios realizados](docs/10-cambios-realizados.md)
 - [API y aplicacion movil](docs/11-api-mobile.md)
+- [ENTREGABLE: Memoria completa del proyecto](docs/ENTREGABLE.md)
 
 ## Estructura Del Repositorio
 
