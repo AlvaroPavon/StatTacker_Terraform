@@ -7,3 +7,8 @@
   ansible.builtin.service:
     name: mysql
     state: restarted
+
+- name: restart jenkins
+  ansible.builtin.service:
+    name: jenkins
+    state: restarted

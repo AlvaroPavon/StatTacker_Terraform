@@ -4,10 +4,95 @@
     update_cache: true
     cache_valid_time: 3600
 
+- name: Install repository prerequisite packages
+  ansible.builtin.apt:
+    name: "{{ repository_prerequisite_packages }}"
+    state: present
+
+- name: Ensure apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Adoptium apt signing key
+  ansible.builtin.shell: |
+    set -e
+    tmp_key="$(mktemp)"
+    wget -qO - "{{ adoptium_key_url }}" | gpg --dearmor > "$tmp_key"
+    install -o root -g root -m 0644 "$tmp_key" /etc/apt/keyrings/adoptium.gpg
+    rm -f "$tmp_key"
+  args:
+    creates: /etc/apt/keyrings/adoptium.gpg
+
+- name: Configure Adoptium apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/adoptium.list
+    owner: root
+    group: root
+    mode: "0644"
+    content: "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] {{ adoptium_repo_url }} {{ ansible_distribution_release }} main\n"
+  register: adoptium_repository
+
+- name: Install Jenkins apt signing key
+  ansible.builtin.get_url:
+    url: "{{ jenkins_key_url }}"
+    dest: /etc/apt/keyrings/jenkins-keyring.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Configure Jenkins LTS apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/jenkins.list
+    owner: root
+    group: root
+    mode: "0644"
+    content: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] {{ jenkins_repo_url }} binary/\n"
+  register: jenkins_repository
+
+- name: Update apt cache after external repositories
+  ansible.builtin.apt:
+    update_cache: true
+  when: adoptium_repository.changed or jenkins_repository.changed
+
 - name: Install StatTracker packages
   ansible.builtin.apt:
     name: "{{ stattracker_packages }}"
     state: present
+
+- name: Install Jenkins packages
+  ansible.builtin.apt:
+    name: "{{ jenkins_packages }}"
+    state: present
+  notify: restart jenkins
+
+- name: Ensure Jenkins systemd override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/jenkins.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure Jenkins port
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/jenkins.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Service]
+      Environment="JENKINS_PORT={{ jenkins_port }}"
+  register: jenkins_systemd_override
+  notify: restart jenkins
+
+- name: Reload systemd when Jenkins override changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: jenkins_systemd_override.changed
 
 - name: Ensure MariaDB/MySQL is enabled and running
   ansible.builtin.service:
@@ -20,6 +105,24 @@
     name: apache2
     state: started
     enabled: true
+
+- name: Ensure Jenkins is enabled and running
+  ansible.builtin.service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Verify Java runtime for Jenkins
+  ansible.builtin.command:
+    cmd: java -version
+  register: jenkins_java_version
+  changed_when: false
+
+- name: Assert Java 21 is available for Jenkins
+  ansible.builtin.assert:
+    that:
+      - "'version \"21' in jenkins_java_version.stderr or 'openjdk 21' in jenkins_java_version.stderr"
+    fail_msg: "Jenkins necesita Java 21, pero java -version no muestra Java 21."
 
 - name: Ensure MySQL database and user exist
   ansible.builtin.shell: |
@@ -323,7 +426,15 @@
     except json.JSONDecodeError:
         data = {}
 
-    cleaned = {ip: value for ip, value in data.items() if not private.match(ip)}
+    if isinstance(data, dict):
+        cleaned = {ip: value for ip, value in data.items() if not private.match(ip)}
+    elif isinstance(data, list):
+        cleaned = [
+            item for item in data
+            if not private.match(str(item.get("ip", item)) if isinstance(item, dict) else str(item))
+        ]
+    else:
+        cleaned = {}
 
     if cleaned != data:
         path.write_text(json.dumps(cleaned, indent=4, ensure_ascii=False))
@@ -396,3 +507,19 @@
       - "'Endpoint no encontrado' not in stattracker_api_root.content"
       - "'Endpoint no encontrado' not in stattracker_api_legacy.content"
     fail_msg: "La API no esta integrada correctamente en Apache o el router no reconoce las rutas esperadas."
+
+- name: Verify Jenkins HTTP response
+  ansible.builtin.uri:
+    url: "http://localhost:{{ jenkins_port }}/login"
+    return_content: true
+    status_code: 200
+  register: jenkins_http
+  retries: 12
+  delay: 10
+  until: jenkins_http.status == 200
+
+- name: Assert Jenkins is serving the setup/login UI
+  ansible.builtin.assert:
+    that:
+      - "'Jenkins' in jenkins_http.content"
+    fail_msg: "Jenkins responde en el puerto {{ jenkins_port }}, pero el contenido no parece ser la UI de Jenkins."

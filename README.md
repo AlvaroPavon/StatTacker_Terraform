@@ -11,6 +11,7 @@ Repositorio de infraestructura para desplegar y operar StatTracker en una VM de 
 - Ruta del proyecto dentro de la VM: `/home/stattracker/StatTacker_Terraform`
 - Aplicacion desplegada en la VM: `/var/www/stattracker`
 - Servicios principales: `apache2` y `mariadb/mysql`
+- Jenkins CI: `http://192.168.5.34:8080/`
 - Arranque automatico en Proxmox: activado
 
 No se documentan contrasenas ni tokens reales. Estan en `terraform.tfvars`, en Proxmox o en la entrega local del entorno.
@@ -31,6 +32,7 @@ La documentacion completa esta en `docs/`:
 - [Seguridad y secretos](docs/09-seguridad.md)
 - [Cambios realizados](docs/10-cambios-realizados.md)
 - [API y aplicacion movil](docs/11-api-mobile.md)
+- [Jenkins](docs/12-jenkins.md)
 - [ENTREGABLE: Memoria completa del proyecto](docs/ENTREGABLE.md)
 
 ## Estructura Del Repositorio
@@ -87,6 +89,12 @@ API para la app movil:
 
 ```text
 http://192.168.5.34/api
+```
+
+Jenkins:
+
+```text
+http://192.168.5.34:8080/
 ```
 
 ## Regla Importante

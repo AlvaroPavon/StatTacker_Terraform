@@ -145,6 +145,30 @@ tail -n 40 /var/www/stattracker/logs/security.log
 
 El rol Ansible corrige el comportamiento en LAN privada y limpia bloqueos temporales de rangos `10.x.x.x`, `172.16-31.x.x` y `192.168.x.x`.
 
+## Jenkins No Responde
+
+Comprobar servicio:
+
+```bash
+systemctl status jenkins
+journalctl -u jenkins -n 100 --no-pager
+```
+
+Comprobar Java:
+
+```bash
+java -version
+```
+
+Debe mostrar Java 21. Si Jenkins arranca pero no carga, comprobar:
+
+```bash
+curl -I http://localhost:8080/login
+systemctl cat jenkins
+```
+
+Si el puerto 8080 estuviera ocupado, cambiar `jenkins_port` en Ansible y ejecutar el playbook.
+
 ## Apache O MariaDB No Arrancan Con Debian
 
 ```bash

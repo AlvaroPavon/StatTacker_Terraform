@@ -10,6 +10,7 @@ flowchart TD
     P --> API["API REST PHP /api"]
     P --> D["MariaDB/MySQL proyecto_imc"]
     P --> C["CSS local: tailwind.css / animate.min.css"]
+    J["Jenkins CI 8080"] --> V
     T["Terraform"] --> X["API Proxmox"]
     X --> V["VM Terraform-StatTracker"]
     CI["cloud-init"] --> V
@@ -45,6 +46,8 @@ La VM ejecuta Debian y contiene:
 - MariaDB habilitado al arranque.
 - Terraform instalado.
 - Ansible instalado.
+- Jenkins instalado y habilitado al arranque.
+- Java 21 instalado mediante Temurin.
 
 ## Aplicacion Web
 
@@ -80,6 +83,16 @@ http://192.168.5.34/proyecto_imc/api
 ```
 
 Ansible configura `Alias /proyecto_imc` en Apache y parchea el router `api/index.php` para aceptar ambas bases.
+
+## Jenkins
+
+Jenkins queda instalado en la VM como servicio systemd independiente de Apache:
+
+```text
+http://192.168.5.34:8080/
+```
+
+Usa Java 21 (`temurin-21-jdk`) y el paquete LTS del repositorio oficial de Jenkins. El puerto se controla desde la variable Ansible `jenkins_port`.
 
 ## Base De Datos
 

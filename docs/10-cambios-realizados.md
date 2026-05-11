@@ -14,6 +14,7 @@ Se corrigio la VM `Terraform-StatTracker`:
 - Se habilitaron servicios al arranque:
   - `apache2`
   - `mariadb`
+  - `jenkins`
 - Se activo arranque automatico de la VM en Proxmox.
 
 ## Cambios En Terraform
@@ -38,6 +39,22 @@ Se creo `ansible/`:
 - Tareas para integrar la API en `/api` y mantener compatibilidad con `/proyecto_imc/api`.
 - Tareas para permitir checks de salud desde LAN privada sin que `UltimateShield` bloquee la IP.
 - Tareas para limpiar bloqueos temporales LAN en `blocked_ips.json`.
+- Tareas para instalar Adoptium Java 21 y Jenkins LTS.
+- Tareas para habilitar Jenkins al arranque y validar `localhost:8080/login`.
+
+## Cambios En Jenkins
+
+Se instalo Jenkins LTS en la VM y quedo accesible en:
+
+```text
+http://192.168.5.34:8080/
+```
+
+Se instalo Java 21 con Temurin porque las versiones recientes de Jenkins requieren Java 21. La contrasena inicial se mantiene solo en la VM:
+
+```text
+/var/lib/jenkins/secrets/initialAdminPassword
+```
 
 ## Cambios En Documentacion
 

@@ -22,6 +22,20 @@ Ruta legacy compatible:
 http://192.168.5.34/proyecto_imc/api
 ```
 
+## Acceso Jenkins
+
+```text
+http://192.168.5.34:8080/
+http://192.168.5.34:8080/login
+```
+
+Para el primer desbloqueo:
+
+```bash
+su -
+cat /var/lib/jenkins/secrets/initialAdminPassword
+```
+
 Si se recrea la VM y cambia la IP:
 
 ```bash
@@ -67,6 +81,7 @@ Comprobar estado:
 systemctl status apache2
 systemctl status mysql
 systemctl status mariadb
+systemctl status jenkins
 ```
 
 Comprobar arranque automatico:
@@ -75,6 +90,7 @@ Comprobar arranque automatico:
 systemctl is-enabled apache2
 systemctl is-enabled mariadb
 systemctl is-enabled mysql
+systemctl is-enabled jenkins
 ```
 
 En el estado actual:
@@ -83,6 +99,7 @@ En el estado actual:
 apache2: enabled / active
 mariadb: enabled
 mysql: alias / active
+jenkins: enabled / active
 ```
 
 ## Comprobacion Rapida De La Web
@@ -112,6 +129,8 @@ Terraform v1.15.2
 Ansible core 2.14.18
 ansible-playbook core 2.14.18
 sshpass 1.09
+Jenkins LTS
+Temurin Java 21
 ```
 
 ## Proyecto Dentro De La VM
